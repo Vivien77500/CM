@@ -1081,32 +1081,39 @@
     function updateScore() {
       gameState.totalScore = gameState.score;
       document.getElementById('scoreValue').textContent = gameState.totalScore;
+      
+      // Calculer la progression vers le mega tir
+      if (!gameState.megaShotReady) {
+        gameState.megaShotScore += (gameState.totalScore - (gameState.lastTotalScore || 0));
+        gameState.lastTotalScore = gameState.totalScore;
+      }
+      
       updateMegaShot();
     }
     
     function updateMegaShot() {
       const display = document.getElementById('megaShotValue');
-      const currentProgress = gameState.totalScore % 2500;
-      gameState.megaShotScore = currentProgress;
-      display.textContent = currentProgress;
       
-      if (currentProgress === 0 && gameState.totalScore > 0 && !gameState.megaShotReady) {
-        gameState.megaShotReady = true;
-        gameState.superShotReady = false;
-        gameState.hitCount = 0;
-        document.getElementById('superShotValue').textContent = '0';
-        document.getElementById('superShotValue').parentElement.style.color = '#ffaa00';
-        document.getElementById('superShotValue').parentElement.style.textShadow = '0 0 10px #ffaa00';
+      // Si le mega tir est prêt, bloquer l'affichage à 2500
+      if (gameState.megaShotReady) {
+        display.textContent = '2500';
         display.parentElement.style.color = '#00ff00';
         display.parentElement.style.textShadow = '0 0 20px #00ff00';
-      } else if (gameState.totalScore >= 2500 && currentProgress >= 2500) {
-        // Premier palier de 2500 atteint
+        return;
+      }
+      
+      // Afficher la progression actuelle
+      display.textContent = gameState.megaShotScore;
+      
+      // Vérifier si on atteint 2500
+      if (gameState.megaShotScore >= 2500) {
         gameState.megaShotReady = true;
         gameState.superShotReady = false;
         gameState.hitCount = 0;
         document.getElementById('superShotValue').textContent = '0';
         document.getElementById('superShotValue').parentElement.style.color = '#ffaa00';
         document.getElementById('superShotValue').parentElement.style.textShadow = '0 0 10px #ffaa00';
+        display.textContent = '2500';
         display.parentElement.style.color = '#00ff00';
         display.parentElement.style.textShadow = '0 0 20px #00ff00';
       }
@@ -1167,7 +1174,9 @@
         gameState.homingMissiles.push(missile);
       }
       
+      // Réinitialiser le compteur mega
       gameState.megaShotReady = false;
+      gameState.megaShotScore = 0;
       const display = document.getElementById('megaShotValue');
       display.textContent = '0';
       display.parentElement.style.color = '#ff00ff';
@@ -1190,8 +1199,7 @@
       gameState.enemySpeed = difficulty.enemySpeed;
       gameState.hitCount = 0;
       gameState.superShotReady = false;
-      gameState.megaShotScore = gameState.totalScore % 2500;
-      gameState.megaShotReady = (gameState.totalScore % 2500 === 0 && gameState.totalScore > 0) || (gameState.totalScore >= 2500 && gameState.totalScore % 2500 >= 0);
+      gameState.lastTotalScore = gameState.totalScore;
       
       gameState.player = new Player(selectedCharacter);
       createEnemies();
@@ -1310,5 +1318,5 @@
       });
     }
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b00f6efd7f7f6a9',t:'MTc2NjA4NTA3MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b01023060d299a5',t:'MTc2NjA4NTUzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
