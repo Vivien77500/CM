@@ -237,6 +237,9 @@
     <div class="super-shot-display" style="color: #ffaa00; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #ffaa00;">
      SUPER TIR: <span id="superShotValue">0</span>/10
     </div>
+    <div class="mega-shot-display" style="color: #ff00ff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #ff00ff;">
+     MEGA TIR: <span id="megaShotValue">0</span>/1000
+    </div>
    </div>
    <canvas id="gameCanvas" width="1400" height="900"></canvas>
    <div id="characterSelect" class="menu-overlay">
@@ -266,7 +269,7 @@
      </div>
     </div>
     <div class="controls-info">
-     Flèches ← → pour bouger | ESPACE pour tirer | S pour SUPER TIR (10 touches)
+     Flèches ← → pour bouger | ESPACE pour tirer | S pour SUPER TIR (10 touches) | M pour MEGA TIR (1000 points)
     </div>
    </div>
    <div id="gameOverMenu" class="menu-overlay hidden">
@@ -321,7 +324,9 @@
       enemySpeed: 1,
       lastEnemyShot: 0,
       hitCount: 0,
-      superShotReady: false
+      superShotReady: false,
+      megaShotScore: 0,
+      megaShotReady: false
     };
 
     class Player {
@@ -339,12 +344,50 @@
       }
 
       draw() {
-        if (gameState.superShotReady) {
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        if (gameState.megaShotReady) {
+          this.auraPhase += 0.1;
+          
+          // Aura violette mega
+          for (let i = 0; i < 4; i++) {
+            const radius = 50 + i * 20 + Math.sin(this.auraPhase + i) * 15;
+            const alpha = 0.4 - i * 0.1;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+            gradient.addColorStop(0, `rgba(255, 0, 255, ${alpha})`);
+            gradient.addColorStop(0.5, `rgba(200, 0, 255, ${alpha * 0.6})`);
+            gradient.addColorStop(1, `rgba(255, 0, 255, 0)`);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.restore();
+          }
+          
+          // Éclairs violets
+          for (let i = 0; i < 12; i++) {
+            const angle = (this.auraPhase * 2 + i * Math.PI / 6) % (Math.PI * 2);
+            const distance = 60 + Math.sin(this.auraPhase * 3 + i) * 10;
+            const sparkX = centerX + Math.cos(angle) * distance;
+            const sparkY = centerY + Math.sin(angle) * distance;
+            
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff00ff';
+            ctx.fillStyle = '#ff00ff';
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          }
+        } else if (gameState.superShotReady) {
           this.auraPhase += 0.08;
           
-          const centerX = this.x + this.width / 2;
-          const centerY = this.y + this.height / 2;
-          
+          // Aura dorée super
           for (let i = 0; i < 3; i++) {
             const radius = 40 + i * 15 + Math.sin(this.auraPhase + i) * 10;
             const alpha = 0.3 - i * 0.1;
@@ -610,7 +653,7 @@
     }
 
     class HomingMissile {
-      constructor(x, y) {
+      constructor(x, y, isMega = false) {
         this.x = x;
         this.y = y;
         this.width = 16;
@@ -620,6 +663,9 @@
         this.target = null;
         this.trail = [];
         this.curveOffset = (Math.random() - 0.5) * 2;
+        this.isMega = isMega;
+        this.hasSplit = false;
+        this.startY = y;
       }
 
       findTarget() {
@@ -641,16 +687,19 @@
 
       draw() {
         // Traînée de fumée
+        const smokeColor = this.isMega ? '#ff00ff' : '#888888';
+        const smokeShadow = this.isMega ? '#cc00cc' : '#666666';
+        
         for (let i = 0; i < this.trail.length; i++) {
           const t = this.trail[i];
           const alpha = (1 - i / this.trail.length) * 0.5;
-          const size = (1 - i / this.trail.length) * 8;
+          const size = (1 - i / this.trail.length) * (this.isMega ? 10 : 8);
           
           ctx.save();
           ctx.globalAlpha = alpha;
-          ctx.fillStyle = '#888888';
-          ctx.shadowBlur = 8;
-          ctx.shadowColor = '#666666';
+          ctx.fillStyle = smokeColor;
+          ctx.shadowBlur = this.isMega ? 12 : 8;
+          ctx.shadowColor = smokeShadow;
           ctx.beginPath();
           ctx.arc(t.x, t.y, size, 0, Math.PI * 2);
           ctx.fill();
@@ -661,7 +710,7 @@
         ctx.translate(this.x, this.y);
         
         // Corps du missile
-        ctx.fillStyle = '#ffaa00';
+        ctx.fillStyle = this.isMega ? '#ff00ff' : '#ffaa00';
         ctx.beginPath();
         ctx.moveTo(0, -17);
         ctx.lineTo(-8, 17);
@@ -670,7 +719,7 @@
         ctx.fill();
         
         // Flammes
-        ctx.fillStyle = '#ff6600';
+        ctx.fillStyle = this.isMega ? '#cc00ff' : '#ff6600';
         ctx.beginPath();
         ctx.moveTo(-4, 17);
         ctx.lineTo(-6, 25);
@@ -683,8 +732,8 @@
         
         // Centre lumineux
         ctx.shadowBlur = 20;
-        ctx.shadowColor = '#ffaa00';
-        ctx.fillStyle = '#ffff00';
+        ctx.shadowColor = this.isMega ? '#ff00ff' : '#ffaa00';
+        ctx.fillStyle = this.isMega ? '#ffccff' : '#ffff00';
         ctx.beginPath();
         ctx.arc(0, 0, 6, 0, Math.PI * 2);
         ctx.fill();
@@ -698,6 +747,15 @@
         this.trail.unshift({ x: this.x, y: this.y });
         if (this.trail.length > 15) {
           this.trail.pop();
+        }
+        
+        // Vérifier si le missile mega doit se séparer (à mi-course)
+        const distanceTraveled = this.startY - this.y;
+        const midPoint = canvas.height / 2;
+        
+        if (this.isMega && !this.hasSplit && distanceTraveled >= midPoint) {
+          this.hasSplit = true;
+          this.split();
         }
         
         if (!this.target || gameState.enemies.indexOf(this.target) === -1) {
@@ -714,6 +772,18 @@
           this.y += Math.sin(angle) * this.speed;
         } else {
           this.y -= this.speed;
+        }
+      }
+      
+      split() {
+        // Créer 2 missiles supplémentaires (total 3 avec celui-ci)
+        const availableEnemies = gameState.enemies.filter(e => e !== this.target);
+        
+        for (let i = 0; i < 2 && i < availableEnemies.length; i++) {
+          const newMissile = new HomingMissile(this.x, this.y, false);
+          newMissile.target = availableEnemies[i];
+          newMissile.curveOffset = (Math.random() - 0.5) * 3;
+          gameState.homingMissiles.push(newMissile);
         }
       }
 
@@ -921,6 +991,19 @@
 
     function updateScore() {
       document.getElementById('scoreValue').textContent = gameState.score;
+      updateMegaShot();
+    }
+    
+    function updateMegaShot() {
+      const display = document.getElementById('megaShotValue');
+      gameState.megaShotScore = Math.min(gameState.score, 1000);
+      display.textContent = gameState.megaShotScore;
+      
+      if (gameState.score >= 1000 && !gameState.megaShotReady) {
+        gameState.megaShotReady = true;
+        display.parentElement.style.color = '#00ff00';
+        display.parentElement.style.textShadow = '0 0 20px #00ff00';
+      }
     }
 
     function updateLives() {
@@ -949,7 +1032,7 @@
       
       // Créer 5 missiles, chacun avec sa propre cible
       for (let i = 0; i < targets.length; i++) {
-        const missile = new HomingMissile(startX, startY);
+        const missile = new HomingMissile(startX, startY, false);
         missile.target = targets[i];
         gameState.homingMissiles.push(missile);
       }
@@ -960,6 +1043,30 @@
       display.textContent = '0';
       display.parentElement.style.color = '#ffaa00';
       display.parentElement.style.textShadow = '0 0 10px #ffaa00';
+    }
+    
+    function fireMegaShot() {
+      if (!gameState.megaShotReady) return;
+      
+      const startX = gameState.player.x + gameState.player.width / 2;
+      const startY = gameState.player.y;
+      
+      // Sélectionner 5 cibles différentes pour les 5 missiles initiaux
+      const targets = gameState.enemies.slice(0, 5);
+      
+      // Créer 5 missiles MEGA, chacun avec sa propre cible
+      for (let i = 0; i < targets.length; i++) {
+        const missile = new HomingMissile(startX, startY, true);
+        missile.target = targets[i];
+        gameState.homingMissiles.push(missile);
+      }
+      
+      gameState.megaShotScore = 0;
+      gameState.megaShotReady = false;
+      const display = document.getElementById('megaShotValue');
+      display.textContent = '0';
+      display.parentElement.style.color = '#ff00ff';
+      display.parentElement.style.textShadow = '0 0 10px #ff00ff';
     }
 
     function startGame() {
@@ -976,6 +1083,8 @@
       gameState.enemySpeed = 1;
       gameState.hitCount = 0;
       gameState.superShotReady = false;
+      gameState.megaShotScore = 0;
+      gameState.megaShotReady = false;
       
       gameState.player = new Player(selectedCharacter);
       createEnemies();
@@ -983,6 +1092,7 @@
       updateScore();
       updateLives();
       updateSuperShot();
+      updateMegaShot();
       
       document.getElementById('characterSelect').classList.add('hidden');
       document.getElementById('gameOverMenu').classList.add('hidden');
@@ -1007,6 +1117,11 @@
       if ((e.key === 's' || e.key === 'S') && gameState.running) {
         e.preventDefault();
         fireSuperShot();
+      }
+      
+      if ((e.key === 'm' || e.key === 'M') && gameState.running) {
+        e.preventDefault();
+        fireMegaShot();
       }
     });
 
@@ -1053,5 +1168,5 @@
       });
     }
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b00707317849e85',t:'MTc2NjA3OTU2Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b00b9f422e99e85',t:'MTc2NjA4MjU3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
