@@ -238,12 +238,50 @@
      SUPER TIR: <span id="superShotValue">0</span>/10
     </div>
     <div class="mega-shot-display" style="color: #ff00ff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #ff00ff;">
-     MEGA TIR: <span id="megaShotValue">0</span>/1000
+     MEGA TIR: <span id="megaShotValue">0</span>/2500
     </div>
    </div>
    <canvas id="gameCanvas" width="1400" height="900"></canvas>
-   <div id="characterSelect" class="menu-overlay">
+   <div id="difficultySelect" class="menu-overlay">
     <h1 class="game-title" id="gameTitle">SPACE INVADERS</h1>
+    <h2 class="choose-character-title">CHOISISSEZ LA DIFFICULTÉ</h2>
+    <div class="character-selection">
+     <div class="character-card" data-difficulty="facile">
+      <div class="character-image-container" style="font-size: 64px;">
+       😊
+      </div>
+      <div class="character-name">
+       FACILE
+      </div><button class="select-button">CHOISIR</button>
+     </div>
+     <div class="character-card" data-difficulty="moyen">
+      <div class="character-image-container" style="font-size: 64px;">
+       😐
+      </div>
+      <div class="character-name">
+       MOYEN
+      </div><button class="select-button">CHOISIR</button>
+     </div>
+     <div class="character-card" data-difficulty="difficile">
+      <div class="character-image-container" style="font-size: 64px;">
+       😰
+      </div>
+      <div class="character-name">
+       DIFFICILE
+      </div><button class="select-button">CHOISIR</button>
+     </div>
+     <div class="character-card" data-difficulty="extreme">
+      <div class="character-image-container" style="font-size: 64px;">
+       💀
+      </div>
+      <div class="character-name">
+       EXTRÊME
+      </div><button class="select-button">CHOISIR</button>
+     </div>
+    </div>
+   </div>
+   <div id="characterSelect" class="menu-overlay hidden">
+    <h1 class="game-title">SPACE INVADERS</h1>
     <h2 class="choose-character-title" id="chooseCharacterText">CHOISISSEZ VOTRE PERSONNAGE</h2>
     <div class="character-selection">
      <div class="character-card" data-character="flavio">
@@ -269,7 +307,7 @@
      </div>
     </div>
     <div class="controls-info">
-     Flèches ← → pour bouger | ESPACE pour tirer | S pour SUPER TIR (10 touches) | M pour MEGA TIR (1000 points)
+     Souris pour bouger | Clic gauche pour tirer | ESPACE pour SUPER TIR (10 touches) | D pour MEGA TIR (2500 points)
     </div>
    </div>
    <div id="gameOverMenu" class="menu-overlay hidden">
@@ -305,6 +343,38 @@
     };
 
     let selectedCharacter = null;
+    let selectedDifficulty = null;
+
+    const difficultySettings = {
+      facile: {
+        lives: 3,
+        enemySpeed: 0.8,
+        enemyShootChance: 0.0005,
+        speedIncrease: 0.3,
+        pointMultiplier: 1
+      },
+      moyen: {
+        lives: 3,
+        enemySpeed: 1,
+        enemyShootChance: 0.001,
+        speedIncrease: 0.5,
+        pointMultiplier: 1.5
+      },
+      difficile: {
+        lives: 3,
+        enemySpeed: 1.3,
+        enemyShootChance: 0.0015,
+        speedIncrease: 0.7,
+        pointMultiplier: 2
+      },
+      extreme: {
+        lives: 3,
+        enemySpeed: 1.8,
+        enemyShootChance: 0.002,
+        speedIncrease: 1,
+        pointMultiplier: 3
+      }
+    };
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -312,6 +382,7 @@
     let gameState = {
       running: false,
       score: 0,
+      totalScore: 0,
       lives: 3,
       player: null,
       enemies: [],
@@ -320,6 +391,7 @@
       homingMissiles: [],
       explosions: [],
       keys: {},
+      mouseX: null,
       enemyDirection: 1,
       enemySpeed: 1,
       lastEnemyShot: 0,
@@ -484,11 +556,23 @@
       }
 
       move() {
+        // Mouvement avec les flèches (optionnel)
         if (gameState.keys['ArrowLeft'] && this.x > 0) {
           this.x -= this.speed;
         }
         if (gameState.keys['ArrowRight'] && this.x < canvas.width - this.width) {
           this.x += this.speed;
+        }
+        
+        // Mouvement avec la souris
+        if (gameState.mouseX !== null) {
+          this.x = gameState.mouseX - this.width / 2;
+          
+          // Limiter dans les bordures
+          if (this.x < 0) this.x = 0;
+          if (this.x > canvas.width - this.width) {
+            this.x = canvas.width - this.width;
+          }
         }
       }
 
@@ -588,7 +672,8 @@
       }
 
       canShoot() {
-        return Math.random() < 0.001;
+        const difficulty = difficultySettings[selectedDifficulty];
+        return Math.random() < difficulty.enemyShootChance;
       }
 
       shoot() {
@@ -665,7 +750,7 @@
         this.curveOffset = (Math.random() - 0.5) * 2;
         this.isMega = isMega;
         this.hasSplit = false;
-        this.startY = y;
+        this.birthTime = Date.now();
       }
 
       findTarget() {
@@ -749,11 +834,10 @@
           this.trail.pop();
         }
         
-        // Vérifier si le missile mega doit se séparer (à mi-course)
-        const distanceTraveled = this.startY - this.y;
-        const midPoint = canvas.height / 2;
+        // Vérifier si le missile mega doit se séparer (après 1 seconde)
+        const timeElapsed = Date.now() - this.birthTime;
         
-        if (this.isMega && !this.hasSplit && distanceTraveled >= midPoint) {
+        if (this.isMega && !this.hasSplit && timeElapsed >= 1000) {
           this.hasSplit = true;
           this.split();
         }
@@ -776,12 +860,12 @@
       }
       
       split() {
-        // Créer 2 missiles supplémentaires (total 3 avec celui-ci)
+        // Créer 1 missile supplémentaire (total 2 avec celui-ci)
         const availableEnemies = gameState.enemies.filter(e => e !== this.target);
         
-        for (let i = 0; i < 2 && i < availableEnemies.length; i++) {
+        if (availableEnemies.length > 0) {
           const newMissile = new HomingMissile(this.x, this.y, false);
-          newMissile.target = availableEnemies[i];
+          newMissile.target = availableEnemies[0];
           newMissile.curveOffset = (Math.random() - 0.5) * 3;
           gameState.homingMissiles.push(newMissile);
         }
@@ -917,7 +1001,9 @@
           if (checkCollision(bullet, enemy)) {
             gameState.enemies.splice(j, 1);
             gameState.bullets.splice(i, 1);
-            gameState.score += enemy.type === 1 ? 20 : 10;
+            const difficulty = difficultySettings[selectedDifficulty];
+            const basePoints = enemy.type === 1 ? 20 : 10;
+            gameState.score += Math.floor(basePoints * difficulty.pointMultiplier);
             gameState.hitCount++;
             updateScore();
             updateSuperShot();
@@ -949,7 +1035,9 @@
             gameState.explosions.push(new Explosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2));
             gameState.enemies.splice(j, 1);
             gameState.homingMissiles.splice(i, 1);
-            gameState.score += (enemy.type === 1 ? 20 : 10) * 2;
+            const difficulty = difficultySettings[selectedDifficulty];
+            const basePoints = (enemy.type === 1 ? 20 : 10) * 2;
+            gameState.score += Math.floor(basePoints * difficulty.pointMultiplier);
             updateScore();
             break;
           }
@@ -983,24 +1071,42 @@
 
       if (gameState.enemies.length === 0) {
         createEnemies();
-        gameState.enemySpeed += 0.5;
+        const difficulty = difficultySettings[selectedDifficulty];
+        gameState.enemySpeed += difficulty.speedIncrease;
       }
 
       requestAnimationFrame(updateGame);
     }
 
     function updateScore() {
-      document.getElementById('scoreValue').textContent = gameState.score;
+      gameState.totalScore = gameState.score;
+      document.getElementById('scoreValue').textContent = gameState.totalScore;
       updateMegaShot();
     }
     
     function updateMegaShot() {
       const display = document.getElementById('megaShotValue');
-      gameState.megaShotScore = Math.min(gameState.score, 1000);
-      display.textContent = gameState.megaShotScore;
+      const currentProgress = gameState.totalScore % 2500;
+      gameState.megaShotScore = currentProgress;
+      display.textContent = currentProgress;
       
-      if (gameState.score >= 1000 && !gameState.megaShotReady) {
+      if (currentProgress === 0 && gameState.totalScore > 0 && !gameState.megaShotReady) {
         gameState.megaShotReady = true;
+        gameState.superShotReady = false;
+        gameState.hitCount = 0;
+        document.getElementById('superShotValue').textContent = '0';
+        document.getElementById('superShotValue').parentElement.style.color = '#ffaa00';
+        document.getElementById('superShotValue').parentElement.style.textShadow = '0 0 10px #ffaa00';
+        display.parentElement.style.color = '#00ff00';
+        display.parentElement.style.textShadow = '0 0 20px #00ff00';
+      } else if (gameState.totalScore >= 2500 && currentProgress >= 2500) {
+        // Premier palier de 2500 atteint
+        gameState.megaShotReady = true;
+        gameState.superShotReady = false;
+        gameState.hitCount = 0;
+        document.getElementById('superShotValue').textContent = '0';
+        document.getElementById('superShotValue').parentElement.style.color = '#ffaa00';
+        document.getElementById('superShotValue').parentElement.style.textShadow = '0 0 10px #ffaa00';
         display.parentElement.style.color = '#00ff00';
         display.parentElement.style.textShadow = '0 0 20px #00ff00';
       }
@@ -1014,7 +1120,7 @@
       const display = document.getElementById('superShotValue');
       display.textContent = Math.min(gameState.hitCount, 10);
       
-      if (gameState.hitCount >= 10 && !gameState.superShotReady) {
+      if (gameState.hitCount >= 10 && !gameState.superShotReady && !gameState.megaShotReady) {
         gameState.superShotReady = true;
         display.parentElement.style.color = '#00ff00';
         display.parentElement.style.textShadow = '0 0 20px #00ff00';
@@ -1022,7 +1128,7 @@
     }
 
     function fireSuperShot() {
-      if (!gameState.superShotReady) return;
+      if (!gameState.superShotReady || gameState.megaShotReady) return;
       
       const startX = gameState.player.x + gameState.player.width / 2;
       const startY = gameState.player.y;
@@ -1051,17 +1157,16 @@
       const startX = gameState.player.x + gameState.player.width / 2;
       const startY = gameState.player.y;
       
-      // Sélectionner 5 cibles différentes pour les 5 missiles initiaux
-      const targets = gameState.enemies.slice(0, 5);
+      // Sélectionner 3 cibles différentes pour les 3 missiles initiaux
+      const targets = gameState.enemies.slice(0, 3);
       
-      // Créer 5 missiles MEGA, chacun avec sa propre cible
+      // Créer 3 missiles MEGA, chacun avec sa propre cible
       for (let i = 0; i < targets.length; i++) {
         const missile = new HomingMissile(startX, startY, true);
         missile.target = targets[i];
         gameState.homingMissiles.push(missile);
       }
       
-      gameState.megaShotScore = 0;
       gameState.megaShotReady = false;
       const display = document.getElementById('megaShotValue');
       display.textContent = '0';
@@ -1070,21 +1175,23 @@
     }
 
     function startGame() {
-      if (!selectedCharacter) return;
+      if (!selectedCharacter || !selectedDifficulty) return;
+      
+      const difficulty = difficultySettings[selectedDifficulty];
       
       gameState.running = true;
-      gameState.score = 0;
-      gameState.lives = 3;
+      gameState.score = gameState.totalScore;
+      gameState.lives = difficulty.lives;
       gameState.bullets = [];
       gameState.enemyBullets = [];
       gameState.homingMissiles = [];
       gameState.explosions = [];
       gameState.enemyDirection = 1;
-      gameState.enemySpeed = 1;
+      gameState.enemySpeed = difficulty.enemySpeed;
       gameState.hitCount = 0;
       gameState.superShotReady = false;
-      gameState.megaShotScore = 0;
-      gameState.megaShotReady = false;
+      gameState.megaShotScore = gameState.totalScore % 2500;
+      gameState.megaShotReady = (gameState.totalScore % 2500 === 0 && gameState.totalScore > 0) || (gameState.totalScore >= 2500 && gameState.totalScore % 2500 >= 0);
       
       gameState.player = new Player(selectedCharacter);
       createEnemies();
@@ -1094,24 +1201,51 @@
       updateSuperShot();
       updateMegaShot();
       
+      document.getElementById('difficultySelect').classList.add('hidden');
       document.getElementById('characterSelect').classList.add('hidden');
       document.getElementById('gameOverMenu').classList.add('hidden');
       
       requestAnimationFrame(updateGame);
     }
+    
+    function resetGame() {
+      gameState.totalScore = 0;
+      gameState.score = 0;
+      selectedCharacter = null;
+      selectedDifficulty = null;
+      document.getElementById('difficultySelect').classList.remove('hidden');
+      document.getElementById('characterSelect').classList.add('hidden');
+      document.getElementById('gameOverMenu').classList.add('hidden');
+    }
 
     function endGame() {
       gameState.running = false;
-      document.getElementById('finalScore').textContent = gameState.score;
+      document.getElementById('finalScore').textContent = gameState.totalScore;
       document.getElementById('gameOverMenu').classList.remove('hidden');
     }
+
+    // Gestion de la souris
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      gameState.mouseX = e.clientX - rect.left;
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+      gameState.mouseX = null;
+    });
+    
+    canvas.addEventListener('click', (e) => {
+      if (gameState.running && gameState.player) {
+        gameState.player.shoot();
+      }
+    });
 
     document.addEventListener('keydown', (e) => {
       gameState.keys[e.key] = true;
       
       if (e.key === ' ' && gameState.running) {
         e.preventDefault();
-        gameState.player.shoot();
+        fireSuperShot();
       }
       
       if ((e.key === 's' || e.key === 'S') && gameState.running) {
@@ -1119,7 +1253,7 @@
         fireSuperShot();
       }
       
-      if ((e.key === 'm' || e.key === 'M') && gameState.running) {
+      if ((e.key === 'd' || e.key === 'D') && gameState.running) {
         e.preventDefault();
         fireMegaShot();
       }
@@ -1129,7 +1263,16 @@
       gameState.keys[e.key] = false;
     });
 
-    document.querySelectorAll('.select-button').forEach(button => {
+    document.getElementById('difficultySelect').querySelectorAll('.select-button').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const card = e.target.closest('.character-card');
+        selectedDifficulty = card.dataset.difficulty;
+        document.getElementById('difficultySelect').classList.add('hidden');
+        document.getElementById('characterSelect').classList.remove('hidden');
+      });
+    });
+
+    document.getElementById('characterSelect').querySelectorAll('.select-button').forEach(button => {
       button.addEventListener('click', (e) => {
         const card = e.target.closest('.character-card');
         selectedCharacter = card.dataset.character;
@@ -1138,8 +1281,7 @@
     });
 
     document.getElementById('restartButton').addEventListener('click', () => {
-      document.getElementById('characterSelect').classList.remove('hidden');
-      document.getElementById('gameOverMenu').classList.add('hidden');
+      resetGame();
     });
 
     async function onConfigChange(config) {
@@ -1168,5 +1310,5 @@
       });
     }
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b00b9f422e99e85',t:'MTc2NjA4MjU3My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b00f6efd7f7f6a9',t:'MTc2NjA4NTA3MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
